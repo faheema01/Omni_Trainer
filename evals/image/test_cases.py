@@ -45,6 +45,7 @@ cases: List[Case[List[ImageInput], ImageModerationResult, Any]] = [
         inputs=[ImageInput(image_file=get_test_data_path("professional_image.jpg"))],
         metadata={"category": "image_moderation"},
         evaluators=(
+            # No flags expected — clean professional image with no PII
             ImageModerationCheck(
                 expected_pii=False,
                 expected_disturbing=False,
@@ -62,6 +63,7 @@ cases: List[Case[List[ImageInput], ImageModerationResult, Any]] = [
         inputs=[ImageInput(image_file=get_test_data_path("image_with_person.jpg"))],
         metadata={"category": "image_moderation"},
         evaluators=(
+            # A person is visible — PII flag must be raised
             ImageModerationCheck(
                 expected_pii=True,
                 expected_disturbing=False,
@@ -78,27 +80,26 @@ cases: List[Case[List[ImageInput], ImageModerationResult, Any]] = [
         name="low_quality_image",
         inputs=[ImageInput(image_file=get_test_data_path("low_quality_image.jpg"))],
         metadata={"category": "image_moderation"},
-
-        # TODO: define the evaluators for this case. We need:
-        # 1. An ImageModerationCheck that expects expected_pii=True, expected_disturbing=False, expected_low_quality=True
-        # 2. An LLMJudge that uses the judge_model and has a rubric that checks that the rationale describes specific quality
-        #    issues (blurry, pixelated, poor exposure, etc.)
         evaluators=(
+            # Low-quality image that also contains a person (PII + low quality)
             ImageModerationCheck(
-                expected_pii=True,  # TODO
-                expected_disturbing=False, # TODO
-                expected_low_quality=True, # TODO
+                expected_pii=True,
+                expected_disturbing=False,
+                expected_low_quality=True,
             ),
+            # include_input=True so the judge can see the actual image when
+            # evaluating whether the rationale describes the right quality issues
             LLMJudge(
                 model=judge_model,
                 rubric="The rationale should describe specific quality issues (blurry, pixelated, poor exposure, etc.)",
-                include_input=True,  # TODO: in this case it is probably useful to include the input image for contextue
+                include_input=True,
             ),
         ),
     ),
 ]
 
 
+# Repeat each case EVAL_NUM_REPEATS times to measure consistency across runs
 image_dataset = Dataset[List[ImageInput], ImageModerationResult, Any](
     cases=create_repeated_cases(cases),
     evaluators=[

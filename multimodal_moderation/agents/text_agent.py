@@ -1,10 +1,11 @@
-from unittest import result
-
 from pydantic_ai import Agent
 from multimodal_moderation.types.model_choice import ModelChoice
-from multimodal_moderation.types.moderation_result import ModerationResult, TextModerationResult
+from multimodal_moderation.types.moderation_result import TextModerationResult
 
 
+# Instructions sent to the LLM on every call.
+# The output section must stay in sync with the fields defined in TextModerationResult:
+#   contains_pii, is_unfriendly, is_unprofessional, rationale.
 MODERATION_INSTRUCTIONS = """
 <context>
 At ACME enterprise we strive for a friendly but professional interaction with our customers.
@@ -27,38 +28,30 @@ Detect if:
 </instructions>
 
 <output>
-Provide a detailed rationale for your choices as well as a confidence score between 0 and 1 on your assessment.
+Provide a detailed rationale for your choices.
 </output>
 """
 
 
-# TODO: Create a Pydantic AI Agent with:
-#   - instructions=MODERATION_INSTRUCTIONS
-#   - output_type=TextModerationResult
-# Hint: Agent is already imported from pydantic_ai
+# The agent wraps the LLM call and enforces the TextModerationResult schema.
+# pydantic-ai validates and parses the model's JSON output into a
+# TextModerationResult instance automatically.
 text_moderation_agent = Agent(
     instructions=MODERATION_INSTRUCTIONS,
     output_type=TextModerationResult,
 )
- # Replace with your Agent
 
 
 async def moderate_text(model_choice: ModelChoice, text: str) -> TextModerationResult:
-
-    # TODO: Run the text_moderation_agent with a prompt containing the text,
-    #       then return result.output
-    # NOTE: in the class we used agent.run_sync but here we need to use
-    #       await agent.run since this is an async function. They work exactly
-    #       the same. Just do:
-    #           result = await agent.run([parameters])
-    #       instead of:
-    #           result = agent.run_sync([parameters])
-    #       like we did in the class.
-    # Make sure to pass: model=model_choice.model and model_settings=model_choice.model_settings
-
- result = await text_moderation_agent.run(
+    # Run the agent with the supplied text as the user prompt.
+    # We pass model and model_settings from model_choice so callers can
+    # swap models (e.g. for evals) without changing this function.
+    result = await text_moderation_agent.run(
         text,
         model=model_choice.model,
         model_settings=model_choice.model_settings,
     )
- return result.output
+
+    # result.output is already a validated TextModerationResult instance —
+    # pydantic-ai parsed and type-checked the LLM response for us.
+    return result.output
